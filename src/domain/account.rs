@@ -22,6 +22,7 @@ pub struct Account {
 
 impl Account {
     /// Makes an empty account for `client`.
+    #[must_use]
     pub fn new(client: ClientId) -> Self {
         Self {
             client,
@@ -33,21 +34,29 @@ impl Account {
     }
 
     /// Gives the ID of the client.
+    #[must_use]
     pub fn client(&self) -> ClientId {
         self.client
     }
 
     /// Gives the funds that the client can withdraw. This value can be less than zero.
+    #[must_use]
     pub fn available(&self) -> Funds {
         self.available
     }
 
     /// Gives the funds that have an open dispute.
+    #[must_use]
     pub fn held(&self) -> Funds {
         self.held
     }
 
     /// Gives the sum of the available funds and the held funds.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the sum is out of range. `record()` check the sum, so this cannot occur.
+    #[must_use]
     pub fn total(&self) -> Funds {
         self.available
             .checked_add(self.held)
@@ -55,6 +64,7 @@ impl Account {
     }
 
     /// Gives `true` after a chargeback on this account.
+    #[must_use]
     pub fn is_frozen(&self) -> bool {
         self.frozen
     }
@@ -138,9 +148,10 @@ impl Account {
 
     /// Rejects `tx` if this account has a transaction with this ID.
     fn ensure_unused(&self, tx: TxId) -> Result<(), Rejection> {
-        match self.transactions.contains_key(&tx) {
-            true => Err(Rejection::DuplicateTransaction(tx)),
-            false => Ok(()),
+        if self.transactions.contains_key(&tx) {
+            Err(Rejection::DuplicateTransaction(tx))
+        } else {
+            Ok(())
         }
     }
 

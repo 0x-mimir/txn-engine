@@ -41,8 +41,8 @@ impl FromStr for RowType {
 /// cause a heap allocation.
 #[derive(Debug, Deserialize)]
 struct Row<'a> {
-    #[serde(rename = "type", deserialize_with = "trimmed")]
-    row_type: RowType,
+    #[serde(deserialize_with = "trimmed")]
+    r#type: RowType,
     #[serde(deserialize_with = "trimmed")]
     client: u16,
     #[serde(deserialize_with = "trimmed")]
@@ -104,7 +104,7 @@ impl TryFrom<Row<'_>> for TransactionEvent {
         // The value `dispute, 1, 1, ` has an amount field that contains only a space.
         let amount = row.amount.map(str::trim_ascii);
         Ok(
-            match (row.row_type, amount.filter(|amount| !amount.is_empty())) {
+            match (row.r#type, amount.filter(|amount| !amount.is_empty())) {
                 (RowType::Deposit, Some(amount)) => Self::Deposit {
                     client,
                     tx,

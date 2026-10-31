@@ -58,11 +58,13 @@ pub struct InvalidAmount(String);
 
 impl Amount {
     /// Gives the funds that this amount adds to a balance.
+    #[must_use]
     pub fn credit(self) -> Funds {
         Funds(self.0)
     }
 
     /// Gives the funds that this amount subtracts from a balance.
+    #[must_use]
     pub fn debit(self) -> Funds {
         // An `Amount` is more than zero, so this negation cannot overflow.
         Funds(-self.0)
@@ -77,7 +79,7 @@ impl Amount {
             return None;
         }
         // Scale the fraction to whole units. For example, `.5` becomes 5000.
-        let padding = 10_i64.pow((DECIMAL_PLACES - fraction.len()) as u32);
+        let padding = 10_i64.pow(u32::try_from(DECIMAL_PLACES - fraction.len()).ok()?);
         let fraction = fraction.parse::<i64>().ok()? * padding;
         let units = whole
             .parse::<i64>()
