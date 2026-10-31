@@ -1,0 +1,62 @@
+type, client, tx, amount
+deposit, 0, 0, 10.0
+deposit, 65535, 4294967295, 2.0
+deposit, 0, 103, 2.5
+withdrawal, 0, 104, 1.5
+withdrawal, 65535, 105, 3.0
+deposit, 0, 0, 5.0
+deposit, 65535, 105, 1.0
+deposit, 65535, 0, 5.0
+withdrawal, 7, 0, 1.0
+dispute, 65535, 0,
+resolve, 0, 0,
+chargeback, 0, 0,
+dispute, 0, 199,
+dispute, 7, 199,
+dispute, 65535, 105,
+dispute, 0, 105,
+dispute, 0, 0,
+dispute, 0, 0,
+withdrawal, 0, 106, 5.0
+resolve, 65535, 0,
+chargeback, 7, 0,
+resolve, 0, 0,
+dispute, 0, 0,
+resolve, 0, 0,
+dispute, 0, 104,
+resolve, 0, 104,
+dispute, 0, 104,
+chargeback, 0, 104,
+withdrawal, 0, 107, 1.0
+deposit, 0, 108, 0.5
+dispute, 0, 104,
+resolve, 0, 104,
+chargeback, 0, 104,
+dispute, 0, 108,
+chargeback, 0, 108,
+deposit, 65535, 109, 1.0
+withdrawal, 65535, 110, 3.0
+dispute, 65535, 4294967295,
+chargeback, 65535, 4294967295,
+deposit, 65535, 111, 3.0001
+deposit, 7, 112, 922337203685477.5807
+deposit, 7, 113, 0.0001
+withdrawal, 7, 114, 0.0001
+deposit, 7, 115, 0.0001
+dispute, 7, 114,
+resolve, 7, 114,
+deposit, 0, 116, 1.23456
+deposit, 0, 116, 0.0001
+DEPOSIT, 0, 118, 1.0
+deposit, 65536, 118, 1.0
+deposit, 0, 4294967296, 1.0
+deposit, 0, 118,
+deposit, 0, 118, 0
+deposit, 0, 118, -1.0
+deposit, 0, 118, 1e3
+deposit, 0, 118, "1.0"
+dispute, 0, 0, 1.0
+deposit, 0, 118, 1,000.50
+complete garbage
+deposit, 0, 118, ÿ
+deposit, 0, 118, 1.0

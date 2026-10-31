@@ -9,6 +9,15 @@ use anyhow::{Context, Result};
 use txn_engine::csv_io::{RowError, read_events, write_accounts};
 use txn_engine::engine::Engine;
 
+/// The heap profiler. Each binary can have only one global allocator, thus this replaces jemalloc.
+#[cfg(feature = "dhat-heap")]
+#[global_allocator]
+static ALLOCATOR: dhat::Alloc = dhat::Alloc;
+
+#[cfg(not(feature = "dhat-heap"))]
+#[global_allocator]
+static ALLOCATOR: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 /// The error if the program cannot write to the standard error.
 const LOG_FAILURE: &str = "cannot write to stderr";
 
@@ -17,6 +26,10 @@ const LOG_FAILURE: &str = "cannot write to stderr";
 /// A row that is not correct and a rejected event cause a message only. All other errors stop
 /// the program, and the program then writes no accounts.
 fn main() -> Result<()> {
+    // The drop of this value writes `dhat-heap.json`, so it must stay alive to the end of main.
+    #[cfg(feature = "dhat-heap")]
+    let _profiler = dhat::Profiler::new_heap();
+
     // Use `args_os`, because a file name is not always UTF-8.
     let path = env::args_os()
         .nth(1)

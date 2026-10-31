@@ -6,5 +6,15 @@ edition = "2024"
 [dependencies]
 anyhow = "1.0.104"
 csv = "1.4.0"
+dhat = { version = "0.3.3", optional = true }
 serde = { version = "1.0.229", features = ["derive"] }
 thiserror = "2.0.21"
+tikv-jemallocator = "0.7.0"
+
+[features]
+dhat-heap = ["dep:dhat"]
+
+# A release build with line tables, so that profiles show file names and line numbers.
+[profile.profiling]
+inherits = "release"
+debug = 1
