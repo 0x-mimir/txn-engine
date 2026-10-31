@@ -1,30 +1,41 @@
+//! The value objects of the domain.
+
 use std::fmt;
 use std::str::FromStr;
 
+/// The number of whole units in the value 1.0.
 const UNITS_PER_WHOLE: i64 = 10_000;
+/// The largest number of digits after the decimal point.
 const DECIMAL_PLACES: usize = 4;
 
+/// The ID of a client.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ClientId(pub u16);
 
+/// The ID of a transaction. This ID is unique for all clients.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TxId(pub u32);
 
-/// A signed balance in whole ten-thousandths, so that arithmetic stays exact.
+/// A signed quantity of money. The value is in whole units of 0.0001, so that all calculations
+/// are exact.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Funds(pub(crate) i64);
 
 impl Funds {
+    /// No funds.
     pub const ZERO: Self = Self(0);
 
+    /// Adds `other`. Gives `None` if the result is out of range.
     pub fn checked_add(self, other: Self) -> Option<Self> {
         self.0.checked_add(other.0).map(Self)
     }
 }
 
+/// Writes the funds with 4 digits after the decimal point.
 impl fmt::Display for Funds {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let sign = if self.0 < 0 { "-" } else { "" };
+        // Use `unsigned_abs`, because `i64::MIN` has no positive `i64` value.
         let magnitude = self.0.unsigned_abs();
         let whole = magnitude / UNITS_PER_WHOLE.unsigned_abs();
         let fraction = magnitude % UNITS_PER_WHOLE.unsigned_abs();
@@ -32,10 +43,13 @@ impl fmt::Display for Funds {
     }
 }
 
-/// A strictly positive transaction amount, in the same whole units as [`Funds`].
+/// A quantity of money that is more than zero, in the same whole units as [`Funds`].
+///
+/// Only [`FromStr`] makes an `Amount`, so each `Amount` is in range.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Amount(i64);
 
+/// The text of an amount is not correct. The value is this text.
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 #[error(
     "invalid amount {0:?}: expected a positive number with at most {DECIMAL_PLACES} decimal places"
@@ -43,20 +57,26 @@ pub struct Amount(i64);
 pub struct InvalidAmount(String);
 
 impl Amount {
+    /// Gives the funds that this amount adds to a balance.
     pub fn credit(self) -> Funds {
         Funds(self.0)
     }
 
+    /// Gives the funds that this amount subtracts from a balance.
     pub fn debit(self) -> Funds {
+        // An `Amount` is more than zero, so this negation cannot overflow.
         Funds(-self.0)
     }
 
+    /// Changes text to whole units. Gives `None` if the text is not correct.
     fn parse(value: &str) -> Option<Self> {
         let (whole, fraction) = value.split_once('.').unwrap_or((value, "0"));
+        // Check the digits here, because `parse::<i64>` also accepts a sign.
         let digits_only = |part: &str| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit());
         if !digits_only(whole) || !digits_only(fraction) || fraction.len() > DECIMAL_PLACES {
             return None;
         }
+        // Scale the fraction to whole units. For example, `.5` becomes 5000.
         let padding = 10_i64.pow((DECIMAL_PLACES - fraction.len()) as u32);
         let fraction = fraction.parse::<i64>().ok()? * padding;
         let units = whole

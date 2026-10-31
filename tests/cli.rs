@@ -1,3 +1,5 @@
+//! Tests the binary from the input file to the exit code.
+
 use std::path::PathBuf;
 use std::process::{Command, Output, Stdio};
 use std::{fs, io, thread};
@@ -38,7 +40,7 @@ dispute, 1, 104,
     assert!(output.status.success());
     assert_eq!(
         stdout(&output),
-        "client,available,held,total,frozen
+        "client,available,held,total,locked
 1,37.5000,10.0000,47.5000,false
 2,20.2500,0.0000,20.2500,false
 "
@@ -57,7 +59,7 @@ dispute,1,2
 
     assert_eq!(
         stdout(&output),
-        "client,available,held,total,frozen
+        "client,available,held,total,locked
 1,3.0000,1.0000,4.0000,false
 "
     );
@@ -75,7 +77,7 @@ fn trims_spaces_around_every_field() {
 
     assert_eq!(
         stdout(&output),
-        "client,available,held,total,frozen
+        "client,available,held,total,locked
 1,3.0000,1.0000,4.0000,false
 "
     );
@@ -87,14 +89,14 @@ fn accepts_windows_line_endings() {
 
     assert_eq!(
         stdout(&output),
-        "client,available,held,total,frozen
+        "client,available,held,total,locked
 1,0.0000,3.0000,3.0000,false
 "
     );
 }
 
 #[test]
-fn a_chargeback_is_reported_as_frozen_with_negative_available() {
+fn a_chargeback_is_reported_as_locked_with_negative_available() {
     let output = run("type,client,tx,amount
 deposit,1,1,3.0
 withdrawal,1,2,3.0
@@ -104,7 +106,7 @@ chargeback,1,1,
 
     assert_eq!(
         stdout(&output),
-        "client,available,held,total,frozen
+        "client,available,held,total,locked
 1,-3.0000,0.0000,-3.0000,true
 "
     );
@@ -120,7 +122,7 @@ dispute,1,2,
 
     assert_eq!(
         stdout(&output),
-        "client,available,held,total,frozen
+        "client,available,held,total,locked
 1,7.0000,3.0000,10.0000,false
 "
     );
@@ -135,7 +137,7 @@ deposit,2,2,1.0
 
     assert_eq!(
         stdout(&output),
-        "client,available,held,total,frozen
+        "client,available,held,total,locked
 2,1.0000,0.0000,1.0000,false
 9,1.0000,0.0000,1.0000,false
 "
@@ -161,7 +163,7 @@ deposit,1,9,2.0
     assert!(output.status.success());
     assert_eq!(
         stdout(&output),
-        "client,available,held,total,frozen
+        "client,available,held,total,locked
 1,3.0000,0.0000,3.0000,false
 "
     );
@@ -178,7 +180,7 @@ withdrawal,1,2,5.0
     assert!(output.status.success());
     assert_eq!(
         stdout(&output),
-        "client,available,held,total,frozen
+        "client,available,held,total,locked
 1,1.0000,0.0000,1.0000,false
 "
     );
@@ -204,7 +206,7 @@ dispute,2,1,
 
     assert_eq!(
         stdout(&output),
-        "client,available,held,total,frozen
+        "client,available,held,total,locked
 1,3.0000,0.0000,3.0000,false
 2,1.0000,0.0000,1.0000,false
 "
@@ -217,7 +219,7 @@ fn a_file_with_no_transactions_prints_only_the_header() {
     let output = run("type,client,tx,amount\n");
 
     assert!(output.status.success());
-    assert_eq!(stdout(&output), "client,available,held,total,frozen\n");
+    assert_eq!(stdout(&output), "client,available,held,total,locked\n");
 }
 
 #[test]
@@ -256,7 +258,7 @@ deposit,2,4,700.0
     assert!(output.status.success());
     assert_eq!(
         stdout(&output),
-        "client,available,held,total,frozen
+        "client,available,held,total,locked
 1,510.0000,0.0000,510.0000,false
 2,700.0000,0.0000,700.0000,false
 "
@@ -275,7 +277,7 @@ dispute,1,3,,junk
 
     assert_eq!(
         stdout(&output),
-        "client,available,held,total,frozen
+        "client,available,held,total,locked
 1,2.0000,0.0000,2.0000,false
 "
     );
@@ -293,7 +295,7 @@ chargeback,1,1,abc
 
     assert_eq!(
         stdout(&output),
-        "client,available,held,total,frozen
+        "client,available,held,total,locked
 1,10.0000,0.0000,10.0000,false
 "
     );
@@ -308,7 +310,7 @@ fn columns_can_come_in_any_order() {
 
     assert_eq!(
         stdout(&output),
-        "client,available,held,total,frozen
+        "client,available,held,total,locked
 2,1.5000,0.0000,1.5000,false
 "
     );
@@ -340,7 +342,7 @@ deposit,1,3,2.0
 
     assert_eq!(
         stdout(&output),
-        "client,available,held,total,frozen
+        "client,available,held,total,locked
 1,2.0000,0.0000,2.0000,false
 "
     );

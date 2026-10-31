@@ -1,3 +1,5 @@
+//! The domain model: accounts, transactions, and the values that they use.
+
 mod account;
 mod event;
 mod rejection;

@@ -1,20 +1,27 @@
+//! The `Account` aggregate.
+
 use std::collections::HashMap;
 
 use super::transaction::{Movement, Transaction};
 use super::{Amount, ClientId, Funds, Rejection, TxId};
 
-/// Aggregate root: a client's funds plus the transactions that can still be disputed.
-/// Frozen accounts refuse only withdrawals, so a negative available can still be repaid.
+/// The funds and the transactions of one client.
+///
+/// `Account` is the aggregate root. All changes to funds go through this type. A frozen account
+/// rejects withdrawals only, so that the client can pay back a negative `available` value.
 #[derive(Debug)]
 pub struct Account {
     client: ClientId,
     available: Funds,
     held: Funds,
     frozen: bool,
+    /// The accepted deposits and withdrawals. A dispute, resolve, or chargeback finds its
+    /// transaction here.
     transactions: HashMap<TxId, Transaction>,
 }
 
 impl Account {
+    /// Makes an empty account for `client`.
     pub fn new(client: ClientId) -> Self {
         Self {
             client,
@@ -25,28 +32,39 @@ impl Account {
         }
     }
 
+    /// Gives the ID of the client.
     pub fn client(&self) -> ClientId {
         self.client
     }
 
+    /// Gives the funds that the client can withdraw. This value can be less than zero.
     pub fn available(&self) -> Funds {
         self.available
     }
 
+    /// Gives the funds that have an open dispute.
     pub fn held(&self) -> Funds {
         self.held
     }
 
+    /// Gives the sum of the available funds and the held funds.
     pub fn total(&self) -> Funds {
         self.available
             .checked_add(self.held)
-            .expect("record() rejects movements that would overflow the total")
+            .expect("record() keeps the total in range")
     }
 
+    /// Gives `true` after a chargeback on this account.
     pub fn is_frozen(&self) -> bool {
         self.frozen
     }
 
+    /// Adds `amount` to the available funds. A frozen account also accepts deposits.
+    ///
+    /// # Errors
+    ///
+    /// Gives [`Rejection::DuplicateTransaction`] if this account has a transaction `tx`.
+    /// Gives [`Rejection::BalanceOverflow`] if the result is out of range.
     pub fn deposit(&mut self, tx: TxId, amount: Amount) -> Result<(), Rejection> {
         self.ensure_unused(tx)?;
         let movement = Movement {
@@ -56,6 +74,13 @@ impl Account {
         self.record(tx, Transaction::deposit(tx, amount), movement)
     }
 
+    /// Subtracts `amount` from the available funds.
+    ///
+    /// # Errors
+    ///
+    /// Gives [`Rejection::AccountFrozen`] if the account is frozen.
+    /// Gives [`Rejection::DuplicateTransaction`] if this account has a transaction `tx`.
+    /// Gives [`Rejection::InsufficientFunds`] if `amount` is more than the available funds.
     pub fn withdraw(&mut self, tx: TxId, amount: Amount) -> Result<(), Rejection> {
         if self.frozen {
             return Err(Rejection::AccountFrozen);
@@ -71,23 +96,47 @@ impl Account {
         self.record(tx, Transaction::withdrawal(tx, amount), movement)
     }
 
+    /// Starts a dispute on the transaction `tx`.
+    ///
+    /// # Errors
+    ///
+    /// Gives [`Rejection::UnknownTransaction`] if this account has no transaction `tx`.
+    /// Gives [`Rejection::AlreadyDisputed`] if the transaction has an open dispute.
+    /// Gives [`Rejection::AlreadyChargedBack`] if the transaction had a chargeback.
+    /// Gives [`Rejection::BalanceOverflow`] if the result is out of range.
     pub fn dispute(&mut self, tx: TxId) -> Result<(), Rejection> {
         let (disputed, movement) = self.transaction(tx)?.dispute()?;
         self.record(tx, disputed, movement)
     }
 
+    /// Stops the open dispute on the transaction `tx`, and removes its effect on the funds.
+    ///
+    /// # Errors
+    ///
+    /// Gives [`Rejection::UnknownTransaction`] if this account has no transaction `tx`.
+    /// Gives [`Rejection::NotDisputed`] if the transaction has no open dispute.
+    /// Gives [`Rejection::AlreadyChargedBack`] if the transaction had a chargeback.
     pub fn resolve(&mut self, tx: TxId) -> Result<(), Rejection> {
         let (resolved, movement) = self.transaction(tx)?.resolve()?;
         self.record(tx, resolved, movement)
     }
 
+    /// Reverses the disputed transaction `tx`, and makes the account frozen.
+    ///
+    /// # Errors
+    ///
+    /// Gives [`Rejection::UnknownTransaction`] if this account has no transaction `tx`.
+    /// Gives [`Rejection::NotDisputed`] if the transaction has no open dispute.
+    /// Gives [`Rejection::AlreadyChargedBack`] if the transaction had a chargeback.
     pub fn chargeback(&mut self, tx: TxId) -> Result<(), Rejection> {
         let (charged_back, movement) = self.transaction(tx)?.chargeback()?;
         self.record(tx, charged_back, movement)?;
+        // Set this value last, because a rejected event must not change the account.
         self.frozen = true;
         Ok(())
     }
 
+    /// Rejects `tx` if this account has a transaction with this ID.
     fn ensure_unused(&self, tx: TxId) -> Result<(), Rejection> {
         match self.transactions.contains_key(&tx) {
             true => Err(Rejection::DuplicateTransaction(tx)),
@@ -95,6 +144,7 @@ impl Account {
         }
     }
 
+    /// Gives a copy of the transaction `tx`.
     fn transaction(&self, tx: TxId) -> Result<Transaction, Rejection> {
         self.transactions
             .get(&tx)
@@ -102,12 +152,14 @@ impl Account {
             .ok_or(Rejection::UnknownTransaction(tx))
     }
 
+    /// Changes the funds and keeps `transaction`, or changes nothing.
     fn record(
         &mut self,
         tx: TxId,
         transaction: Transaction,
         movement: Movement,
     ) -> Result<(), Rejection> {
+        // Calculate all values first, because a rejected event must not change the account.
         let available = self
             .available
             .checked_add(movement.available)
@@ -116,7 +168,7 @@ impl Account {
             .held
             .checked_add(movement.held)
             .ok_or(Rejection::BalanceOverflow)?;
-        // Checked here so that total() can add the two without panicking.
+        // Do this check here, so that total() cannot fail.
         available
             .checked_add(held)
             .ok_or(Rejection::BalanceOverflow)?;

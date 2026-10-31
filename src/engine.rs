@@ -1,17 +1,29 @@
+//! The engine that sends events to client accounts.
+
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, HashMap};
 
 use crate::domain::{Account, ClientId, Rejection, TransactionEvent, TxId};
 
-/// Applies transaction events in order to the accounts of all clients.
+/// The accounts of all clients, and the owner of each transaction ID.
 #[derive(Debug, Default)]
 pub struct Engine {
+    /// A sorted map, so that the output is in the sequence of the client IDs.
     accounts: BTreeMap<ClientId, Account>,
+    /// The client that first used each ID. This map also keeps the IDs of rejected transactions.
     transaction_owners: HashMap<TxId, ClientId>,
 }
 
 impl Engine {
+    /// Sends `event` to the account of its client.
+    ///
+    /// # Errors
+    ///
+    /// Gives [`Rejection::DuplicateTransaction`] if a deposit or withdrawal uses an ID again.
+    /// Gives [`Rejection::ClientMismatch`] if the ID belongs to a different client.
+    /// Gives each other [`Rejection`] from the [`Account`] method for the event.
     pub fn process(&mut self, event: TransactionEvent) -> Result<(), Rejection> {
+        // Register the ID first, so that a wrong client cannot open an account.
         match event {
             TransactionEvent::Deposit { client, tx, amount } => {
                 self.register_transaction(client, tx)?;
@@ -29,11 +41,13 @@ impl Engine {
         }
     }
 
+    /// Gives all accounts in the sequence of the client IDs.
     pub fn accounts(&self) -> impl Iterator<Item = &Account> {
         self.accounts.values()
     }
 
-    /// IDs are globally unique, so even a refused transaction stays with its submitter.
+    /// Records `client` as the owner of `tx`. IDs are unique for all clients, so a rejected
+    /// transaction also keeps its ID.
     fn register_transaction(&mut self, client: ClientId, tx: TxId) -> Result<(), Rejection> {
         match self.transaction_owners.entry(tx) {
             Entry::Vacant(entry) => {
@@ -51,6 +65,7 @@ impl Engine {
         }
     }
 
+    /// Finds the account of `client`, if `tx` does not belong to a different client.
     fn owned_account(&mut self, client: ClientId, tx: TxId) -> Result<&mut Account, Rejection> {
         match self.transaction_owners.get(&tx) {
             Some(&expected) if expected != client => Err(Rejection::ClientMismatch {
@@ -65,6 +80,7 @@ impl Engine {
         }
     }
 
+    /// Finds the account of `client`, or makes a new account.
     fn open_account(&mut self, client: ClientId) -> &mut Account {
         self.accounts
             .entry(client)
